@@ -1,0 +1,19 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Show files
+        run: ls -l
+
+      - name: Success message
+        run: echo "GitHub Actions pipeline executed successfully!"
