@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+
+  # ── Backend ─────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smart-energy-backend
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ── Frontend ────────────────────────────
+  frontend:
+    image: nginx:alpine
+    container_name: smart-energy-frontend
+    ports:
+      - "8081:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+networks:
+  default:
+    name: smart-energy-net

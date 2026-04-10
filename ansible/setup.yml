@@ -1,0 +1,165 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# ansible/setup.yml
+#
+# Infrastructure-as-Code playbook.
+# Installs: Docker, Jenkins, kubectl, and copies the project onto the server.
+#
+# Usage:
+#   ansible-playbook -i inventory.ini setup.yml
+#
+# Tested on: Ubuntu 22.04 LTS
+# ─────────────────────────────────────────────────────────────────────────────
+
+- name: Smart Energy – Server Setup
+  hosts: devops_servers
+  become: true             # Run tasks as root (sudo)
+  vars:
+    app_dir: /opt/smart-energy
+    docker_compose_version: "2.27.0"
+
+  tasks:
+
+    # ── 1. System updates ────────────────────────────────────────────────────
+    - name: Update apt cache and upgrade packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+        cache_valid_time: 3600   # Skip if cache is < 1 hour old
+
+    - name: Install common utilities
+      apt:
+        name:
+          - curl
+          - wget
+          - git
+          - unzip
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+
+    # ── 2. Install Docker ────────────────────────────────────────────────────
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_lsb.codename }} stable"
+        state: present
+
+    - name: Install Docker Engine
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: present
+        update_cache: yes
+
+    - name: Enable and start Docker service
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Add ubuntu user to the docker group (no sudo needed for docker cmds)
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    # ── 3. Install Docker Compose ────────────────────────────────────────────
+    - name: Install Docker Compose v2
+      get_url:
+        url: "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-linux-x86_64"
+        dest: /usr/local/bin/docker-compose
+        mode: "0755"
+
+    # ── 4. Install Java (required by Jenkins) ────────────────────────────────
+    - name: Install OpenJDK 17
+      apt:
+        name: openjdk-17-jdk
+        state: present
+
+    # ── 5. Install Jenkins ───────────────────────────────────────────────────
+    - name: Add Jenkins GPG key
+      apt_key:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+        state: present
+
+    - name: Add Jenkins repository
+      apt_repository:
+        repo: "deb https://pkg.jenkins.io/debian-stable binary/"
+        state: present
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+        update_cache: yes
+
+    - name: Enable and start Jenkins
+      systemd:
+        name: jenkins
+        enabled: yes
+        state: started
+
+    - name: Add Jenkins user to docker group
+      user:
+        name: jenkins
+        groups: docker
+        append: yes
+
+    # ── 6. Install kubectl ───────────────────────────────────────────────────
+    - name: Add Kubernetes GPG key
+      apt_key:
+        url: https://pkgs.k8s.io/core:/stable:/v1.29/deb/Release.key
+        state: present
+
+    - name: Add Kubernetes repository
+      apt_repository:
+        repo: "deb https://pkgs.k8s.io/core:/stable:/v1.29/deb/ /"
+        state: present
+
+    - name: Install kubectl
+      apt:
+        name: kubectl
+        state: present
+        update_cache: yes
+
+    # ── 7. Deploy application files ──────────────────────────────────────────
+    - name: Create app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: "0755"
+
+    - name: Copy project files to server
+      copy:
+        src: "../"          # Copies the entire project folder
+        dest: "{{ app_dir }}"
+        owner: ubuntu
+        group: ubuntu
+        mode: "0644"
+
+    # ── 8. Pull & start containers with Docker Compose ───────────────────────
+    - name: Start application containers
+      community.docker.docker_compose_v2:
+        project_src: "{{ app_dir }}"
+        state: present
+      become_user: ubuntu
+
+    # ── 9. Print helpful summary ─────────────────────────────────────────────
+    - name: Show access info
+      debug:
+        msg:
+          - "✅ Setup complete!"
+          - "Jenkins → http://{{ ansible_host }}:8080"
+          - "API     → http://{{ ansible_host }}:5000"
+          - "Run: sudo cat /var/lib/jenkins/secrets/initialAdminPassword for Jenkins setup"

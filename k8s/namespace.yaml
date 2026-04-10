@@ -1,0 +1,8 @@
+# k8s/namespace.yaml
+# Create a dedicated namespace to isolate all project resources
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: smart-energy
+  labels:
+    project: smart-energy-monitoring

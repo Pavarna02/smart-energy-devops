@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Smart Energy Monitor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #0b1220;
+      color: white;
+      transition: all 0.3s ease-in-out;
+    }
+
+    /* HEADER */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      padding: 15px 25px;
+      background: linear-gradient(to right, #0f172a, #020617);
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .header h2 {
+      margin: 0;
+      color: #38bdf8;
+    }
+
+    .live {
+      color: #22c55e;
+      font-weight: bold;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* CARDS */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+      padding: 20px;
+    }
+
+    .card {
+      background: linear-gradient(145deg, #1e293b, #0f172a);
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.4);
+      transition: 0.3s;
+    }
+
+    .card:hover {
+      transform: translateY(-5px) scale(1.02);
+      box-shadow: 0 0 25px rgba(34,197,94,0.2);
+    }
+
+    .card h4 {
+      margin: 0;
+      color: #94a3b8;
+    }
+
+    .value {
+      font-size: 30px;
+      margin-top: 10px;
+      font-weight: bold;
+      text-shadow: 0 0 8px rgba(255,255,255,0.2);
+    }
+
+    .v { color: #60a5fa; }
+    .c { color: #f59e0b; }
+    .p { color: #34d399; }
+
+    /* MAIN GRID */
+    .main {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 15px;
+      padding: 20px;
+    }
+
+    .box {
+      background: #1e293b;
+      padding: 15px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0,0,0,0.3);
+    }
+
+    /* TABLE */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 8px;
+      border-bottom: 1px solid #334155;
+      text-align: center;
+    }
+
+    th {
+      color: #94a3b8;
+    }
+
+    tr:hover {
+      background: rgba(255,255,255,0.05);
+    }
+
+  </style>
+</head>
+
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <h2>⚡ SMART ENERGY MONITOR</h2>
+  <div class="live">● LIVE</div>
+</div>
+
+<!-- CARDS -->
+<div class="cards">
+  <div class="card">
+    <h4>Voltage</h4>
+    <div class="value v" id="voltage">--</div>
+  </div>
+
+  <div class="card">
+    <h4>Current</h4>
+    <div class="value c" id="current">--</div>
+  </div>
+
+  <div class="card">
+    <h4>Power</h4>
+    <div class="value p" id="power">--</div>
+  </div>
+
+  <div class="card">
+    <h4>Status</h4>
+    <div class="value" id="status">--</div>
+  </div>
+</div>
+
+<!-- MAIN SECTION -->
+<div class="main">
+
+  <!-- BIG GRAPH -->
+  <div class="box">
+    <h4>Power Usage</h4>
+    <canvas id="powerChart"></canvas>
+  </div>
+
+  <!-- SMALL GRAPH -->
+  <div class="box">
+    <h4>Voltage vs Current</h4>
+    <canvas id="scatterChart"></canvas>
+  </div>
+
+</div>
+
+<!-- TABLE -->
+<div class="box" style="margin:20px;">
+  <h4>Recent Readings</h4>
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Voltage</th>
+        <th>Current</th>
+        <th>Power</th>
+      </tr>
+    </thead>
+    <tbody id="tableData"></tbody>
+  </table>
+</div>
+
+<script>
+
+// POWER CHART
+let powerChart = new Chart(document.getElementById('powerChart'), {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [{
+      label: 'Power',
+      data: [],
+      borderColor: '#22c55e',
+      backgroundColor: 'rgba(34,197,94,0.2)',
+      fill: true,
+      tension: 0.4
+    }]
+  },
+  options: {
+    plugins: {
+      legend: { labels: { color: "white" } }
+    },
+    scales: {
+      x: {
+        ticks: { color: "#94a3b8" },
+        grid: { color: "rgba(255,255,255,0.05)" }
+      },
+      y: {
+        ticks: { color: "#94a3b8" },
+        grid: { color: "rgba(255,255,255,0.05)" }
+      }
+    }
+  }
+});
+
+// SCATTER CHART
+let scatterChart = new Chart(document.getElementById('scatterChart'), {
+  type: 'scatter',
+  data: {
+    datasets: [{
+      label: 'V vs I',
+      data: [],
+      backgroundColor: '#f59e0b'
+    }]
+  },
+  options: {
+    plugins: {
+      legend: { labels: { color: "white" } }
+    },
+    scales: {
+      x: {
+        ticks: { color: "#94a3b8" },
+        grid: { color: "rgba(255,255,255,0.05)" }
+      },
+      y: {
+        ticks: { color: "#94a3b8" },
+        grid: { color: "rgba(255,255,255,0.05)" }
+      }
+    }
+  }
+});
+
+async function fetchData() {
+  let res = await fetch("http://localhost:5000/api/readings?limit=10");
+  let data = await res.json();
+  let readings = data.readings;
+
+  let latest = readings[readings.length - 1];
+
+  // UPDATE CARDS
+  document.getElementById("voltage").innerText = latest.voltage + " V";
+  document.getElementById("current").innerText = latest.current + " A";
+  document.getElementById("power").innerText = latest.power + " W";
+
+  // STATUS COLOR LOGIC
+  let status = "NORMAL";
+  let color = "#22c55e";
+
+  if (latest.power > 2500) {
+    status = "HIGH LOAD ⚠️";
+    color = "#ef4444";
+  }
+
+  let statusEl = document.getElementById("status");
+  statusEl.innerText = status;
+  statusEl.style.color = color;
+
+  // UPDATE LINE CHART
+  powerChart.data.labels = readings.map(r => r.timestamp.split("T")[1].slice(0,8));
+  powerChart.data.datasets[0].data = readings.map(r => r.power);
+  powerChart.update();
+
+  // UPDATE SCATTER
+  scatterChart.data.datasets[0].data = readings.map(r => ({
+    x: r.voltage,
+    y: r.current
+  }));
+  scatterChart.update();
+
+  // UPDATE TABLE
+  let table = document.getElementById("tableData");
+  table.innerHTML = "";
+
+  readings.slice().reverse().forEach(r => {
+    table.innerHTML += `
+      <tr>
+        <td>${r.timestamp.split("T")[1].slice(0,8)}</td>
+        <td>${r.voltage}</td>
+        <td>${r.current}</td>
+        <td>${r.power}</td>
+      </tr>
+    `;
+  });
+}
+
+setInterval(fetchData, 3000);
+fetchData();
+
+</script>
+
+</body>
+</html>

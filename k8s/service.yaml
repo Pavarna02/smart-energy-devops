@@ -1,0 +1,26 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# k8s/service.yaml
+#
+# Exposes the Smart Energy Backend pods via a stable DNS name inside the cluster.
+# Type LoadBalancer provisions a cloud LB (AWS ELB, GCP LB, etc.).
+# For local minikube, use:  minikube service smart-energy-backend -n smart-energy
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: smart-energy-backend
+  namespace: smart-energy
+  labels:
+    app: smart-energy-backend
+spec:
+  # LoadBalancer → public IP on cloud  |  NodePort → useful for local testing
+  type: LoadBalancer
+
+  selector:
+    app: smart-energy-backend   # Must match the pod labels in deployment.yaml
+
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80           # External port clients connect to
+      targetPort: 5000   # Pod port where Flask/Gunicorn listens

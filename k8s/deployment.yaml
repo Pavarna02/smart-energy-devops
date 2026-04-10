@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# k8s/deployment.yaml
+#
+# Kubernetes Deployment for the Smart Energy Backend
+#   • 2 replicas for availability
+#   • Self-healing via restartPolicy and liveness/readiness probes
+#   • Resource limits to prevent runaway containers
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smart-energy-backend
+  namespace: smart-energy
+  labels:
+    app: smart-energy-backend
+    version: "1.0"
+spec:
+  replicas: 2                     # Run 2 pods; HPA will scale this up/down
+
+  selector:
+    matchLabels:
+      app: smart-energy-backend
+
+  # Rolling update strategy: replace pods one at a time with zero downtime
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1         # Allow 1 extra pod during rollout
+      maxUnavailable: 0   # Never take a pod down before a new one is ready
+
+  template:
+    metadata:
+      labels:
+        app: smart-energy-backend
+    spec:
+      containers:
+        - name: backend
+          image: yourdockerhubuser/smart-energy-backend:latest  # CI will override tag
+
+          ports:
+            - containerPort: 5000
+              name: http
+
+          # ── Resource limits ──────────────────────────────────────────────
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
+          # ── Liveness probe: restart the pod if the /health endpoint fails ─
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15   # Give Gunicorn time to start
+            periodSeconds: 20
+            failureThreshold: 3
+
+          # ── Readiness probe: only route traffic once the pod is warm ─────
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+          # ── Environment variables ────────────────────────────────────────
+          env:
+            - name: FLASK_ENV
+              value: "production"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+
+      # Restart any crashed container automatically (default, but explicit)
+      restartPolicy: Always

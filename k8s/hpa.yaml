@@ -1,0 +1,30 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# k8s/hpa.yaml
+#
+# Horizontal Pod Autoscaler (HPA)
+#   • Scales between 2 and 6 replicas based on CPU utilisation
+#   • Keeps average CPU below 60% across all pods
+#   • Requires metrics-server:  kubectl apply -f
+#       https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: smart-energy-hpa
+  namespace: smart-energy
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: smart-energy-backend
+
+  minReplicas: 2    # Always keep at least 2 pods for HA
+  maxReplicas: 6    # Don't spin up more than 6 to control costs
+
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60   # Scale up when avg CPU > 60%
